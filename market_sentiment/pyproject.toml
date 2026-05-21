@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling >= 1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "market-sentiment"
+version = "0.1.0"
+dependencies = [
+    "boto3>=1.43.5",
+    "google-cloud-bigquery>=3.41.0",
+    "nltk>=3.9.4",
+    "pandas>=3.0.2",
+    "pydantic>=2.13.4",
+    "python-dotenv>=1.2.2",
+    "requests>=2.33.1"
+]
+requires-python = ">=3.12"
+authors = [
+    {name = "Justin Pretorius", email = "justindpretorius123@gmail.com"},
+]
+description = "Company market sentiment via real-time financial intelligence."
+readme = "README.md"
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15.12",
+    "pytest>=9.0.3"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/market_sentiment"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["D104"]
+"tests/**/*.py" = ["D100", "D101", "D102", "D103"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+docstring-code-format = true
+docstring-code-line-length = 72
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[project.urls]
+Repository = "https://github.com/jdpretorius123/financial_portfolio"
