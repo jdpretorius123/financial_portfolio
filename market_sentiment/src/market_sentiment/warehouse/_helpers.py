@@ -16,8 +16,8 @@ Functions:
 import os
 
 DATA_DESC_BY_SOURCE = {
-    "AlphaVantage": "news_sentiment.json",
-    "NewsAPI": "articles.json",
+    "AlphaVantage": "news_sentiment",
+    "NewsAPI": "articles",
 }
 
 
@@ -65,7 +65,7 @@ def create_warehouse_key(key_prefix: str, fetch_date: str) -> str:
     Returns:
         str: The warehouse key.
     """
-    warehouse_key = f"{key_prefix}{fetch_date}/{get_data_desc(key_prefix)}"
+    warehouse_key = f"{key_prefix}{fetch_date}/{get_data_desc(key_prefix)}.json"
     return warehouse_key
 
 

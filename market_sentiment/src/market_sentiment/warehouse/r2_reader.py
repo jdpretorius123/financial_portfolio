@@ -79,18 +79,18 @@ def read_ticker(
                 key=key,
                 upload_metadata=None,
                 error_message=f"{type(exc).__name__ + ' ' + str(exc)}",
-                error_type=f"{type(exc)}",
+                error_type=f"{type(exc).__name__}",
             )
     body = response["Body"].read()
     if body == b"":
         return ReadFailure(
             read_date=read_date,
             key=key,
-            upload_metadata=response["Metadata"],
+            upload_metadata=None,
             error_message=f"Empty body for key: {key}.",
-            error_type="EmptyBody"
+            error_type="EmptyBody",
         )
-    
+
     return ReadResult(
         read_date=read_date,
         key=key,
@@ -154,7 +154,7 @@ def read_all_tickers(
                         key=kp,
                         upload_metadata=None,
                         error_message=f"{type(exc).__name__ + ' ' + str(exc)}",
-                        error_type=f"{type(exc)}",
+                        error_type=f"{type(exc).__name__}",
                     )
                 )
             continue
@@ -169,6 +169,7 @@ def read_all_tickers(
                     error_type="EmptyPrefix",
                 )
             )
+            continue
 
         if fetch_date is not None:
             key = create_warehouse_key(kp, fetch_date)

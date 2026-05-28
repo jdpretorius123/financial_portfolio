@@ -1,15 +1,18 @@
 """Read classes for transferring read response data from warehousing to ETL.
 
-The Read, ReadResult, and ReadFailure classes transfer raw read response data from
-warehousing (R2) to ETL. The ReadResult class is used for transferring successful read
-responses, and the ReadFailure class is used for transferring failed read responses.
+Read is the parent class of ReadResult and ReadFailure. ReadResult and ReadFailure
+transfer raw read response data from warehousing (R2) to ETL. The ReadResult class is
+used for transferring successful read responses, and the ReadFailure class is used for
+transferring failed read responses.
 
 Classes:
-    Read: Transfers data from warehousing to ETL.
+    Read: Parent class of ReadResult and ReadFailure data.
     ReadResult: Transfers successful read responses from warehousing to ETL.
     ReadFailure: Transfers unsuccessful read responses from warehousing to ETL.
 """
 
+import os
+from abc import ABC, abstractmethod
 from datetime import datetime
 
 from market_sentiment.warehouse._helpers import DATA_DESC_BY_SOURCE
@@ -21,35 +24,23 @@ class FileTypeError(Exception):
     pass
 
 
-class Read:
-    """Transfers read response data from warehousing to ETL.
+class Read(ABC):
+    """Parent class of ReadResult and ReadFailure.
 
     Attributes:
         read_date (str): The date of the read.
-        key (str): The object's warehousing key.
-        upload_metadata (dict[str, str] | None): The metadata uploaded into the
-            warehouse with the object.
     """
 
-    def __init__(
-        self, read_date: str, key: str, upload_metadata: dict[str, str] | None
-    ):
+    def __init__(self, read_date: str) -> None:
         """Initializes the Read class.
 
         Args:
             read_date (str): The date of the read.
-            key (str): The object's warehousing key.
-            upload_metadata (dict[str, str] | None): The metadata uploaded into the
-                warehouse with the object.
 
         Raises:
             ValueError: If an incorrect value is passed to a setter.
-            KeyError: If a key is missing from upload_metadata.
-            FileTypeError: If setting an invalid file type as a warehousing key.
         """
         self.read_date = read_date
-        self.key = key
-        self.upload_metadata = upload_metadata
 
     @property
     def read_date(self) -> str:
@@ -58,56 +49,20 @@ class Read:
 
     @read_date.setter
     def read_date(self, value: str) -> None:
-        self._read_date = datetime.strptime(value, "%Y_%m_%d").strftime("%Y_%m_%d")
+        datetime.strptime(value, "%Y_%m_%d")
+        self._read_date = value
 
     @property
+    @abstractmethod
     def key(self) -> str:
         """The object's warehousing key."""
-        return self._key
-
-    @key.setter
-    def key(self, value: str) -> None:
-        expected_length = 4
-        key_parts = value.split("/")
-        if len(key_parts) != expected_length:
-            err_msg = f"Invalid Key <source>/<ticker>/<fetch_date>/<data_desc>: {value}"
-            raise ValueError(err_msg)
-
-        source = key_parts[0]
-        ticker = key_parts[1]
-        fetch_date = key_parts[2]
-        data_desc = key_parts[3][:-5]
-        file_type = key_parts[3][-5:]
-
-        if source not in DATA_DESC_BY_SOURCE.keys():
-            raise ValueError("Valid Sources: AlphaVantage, NewsAPI.")
-
-        if ticker == "":
-            raise ValueError("Missing Ticker.")
-
-        datetime.strptime(fetch_date, "%Y_%m_%d")
-
-        if data_desc not in DATA_DESC_BY_SOURCE.values():
-            raise ValueError("Valid Data Descriptions: news_sentiment and articles.")
-
-        if file_type != ".json":
-            raise FileTypeError("Valid File Types: .json")
-
-        self._key = value
+        pass
 
     @property
+    @abstractmethod
     def upload_metadata(self) -> dict[str, str] | None:
         """The metadata uploaded into the warehouse with the object."""
-        return self._upload_metadata
-
-    @upload_metadata.setter
-    def upload_metadata(self, value: dict[str, str] | None) -> None:
-        expected_keys = {"fetch_date", "source", "ticker", "http_status"}
-        if value is not None:
-            missing_keys = expected_keys - value.keys()
-            if missing_keys:
-                raise KeyError(f"Missing Keys: {missing_keys}.")
-        self._upload_metadata = value
+        pass
 
 
 class ReadResult(Read):
@@ -116,6 +71,9 @@ class ReadResult(Read):
     The ReadResult class transfers usable read data from warehousing to ETL.
 
     Attributes:
+        key (str): The object's warehousing key.
+        upload_metadata (dict[str, str]): The metadata uploaded into the warehouse with
+            the object.
         usable_data (bytes): Usable data from the warehouse.
     """
 
@@ -134,9 +92,67 @@ class ReadResult(Read):
             upload_metadata (dict[str, str]): The metadata uploaded into the
                 warehouse with the object.
             usable_data (bytes): Usable data from the warehouse.
+
+        Raises:
+            KeyError: If a key is missing from upload_metadata.
+            ValueError: If None is incorrectly passed to the upload_metadata
+                setter.
+            FileTypeError: If setting an invalid file type as a warehousing key.
         """
-        super().__init__(read_date, key, upload_metadata)
+        super().__init__(read_date)
+        self.key = key
+        self.upload_metadata = upload_metadata
         self.usable_data = usable_data
+
+    @property
+    def key(self) -> str:
+        """The object's warehousing key."""
+        return self._key
+
+    @key.setter
+    def key(self, value: str) -> None:
+        expected_length = 4
+        key_parts = value.split("/")
+        if len(key_parts) != expected_length:
+            err_msg = f"Invalid Key <source>/<ticker>/<fetch_date>/<data_desc>: {value}"
+            raise ValueError(err_msg)
+
+        source = key_parts[0]
+        ticker = key_parts[1]
+        fetch_date = key_parts[2]
+        data_desc, file_type = os.path.splitext(key_parts[3])
+
+        if source not in DATA_DESC_BY_SOURCE.keys():
+            raise ValueError("Valid Sources: AlphaVantage, NewsAPI.")
+
+        if ticker == "":
+            raise ValueError("Missing Ticker.")
+
+        datetime.strptime(fetch_date, "%Y_%m_%d")
+
+        if data_desc not in DATA_DESC_BY_SOURCE.values():
+            raise ValueError("Valid Data Descriptions: news_sentiment and articles.")
+
+        if file_type != ".json":
+            raise FileTypeError("Valid File Types: .json")
+
+        self._key = value
+
+    @property
+    def upload_metadata(self) -> dict[str, str]:
+        """The metadata uploaded into the warehouse with the object."""
+        return self._upload_metadata
+
+    @upload_metadata.setter
+    def upload_metadata(self, value: dict[str, str] | None) -> None:
+        if value is None:
+            raise ValueError("Metadata cannot be None for a successful ReadResult.")
+
+        expected_keys = {"fetch_date", "source", "ticker", "http_status"}
+        missing_keys = expected_keys - value.keys()
+        if missing_keys:
+            raise KeyError(f"Missing Keys: {missing_keys}.")
+        self._upload_metadata = value
 
     @property
     def usable_data(self) -> bytes:
@@ -158,6 +174,9 @@ class ReadFailure(Read):
     warehousing to ETL.
 
     Attributes:
+        key (str): The object's warehousing key.
+        upload_metadata (dict[str, str] | None): The metadata uploaded into the
+                warehouse with the object.
         error_message (str): Description of the read response error.
         error_type (str): The error type of the read response.
     """
@@ -168,21 +187,57 @@ class ReadFailure(Read):
         key: str,
         upload_metadata: dict[str, str] | None,
         error_message: str,
-        error_type: str
+        error_type: str,
     ):
         """Initializes the ReadFailure class.
 
         Args:
             read_date (str): The date of the read.
             key (str): The object's warehousing key.
-            upload_metadata (dict[str, str] | None): The data uploaded into the
+            upload_metadata (dict[str, str] | None): The metadata uploaded into the
                 warehouse with the object.
             error_message (str): A description of the read response error.
             error_type (str): The error type of the read response.
         """
-        super().__init__(read_date, key, upload_metadata)
+        super().__init__(read_date)
+        self.key = key
+        self.upload_metadata = upload_metadata
         self.error_message = error_message
         self.error_type = error_type
+
+    @property
+    def key(self) -> str:
+        """The object's warehousing key."""
+        return self._key
+
+    @key.setter
+    def key(self, value: str) -> None:
+        expected_length = 1
+        key_parts = value.split("/")
+        source = key_parts[0]
+
+        if len(key_parts) != expected_length:
+            err_msg = f"Invalid Key <source>/: {value}"
+            raise ValueError(err_msg)
+
+        if source not in DATA_DESC_BY_SOURCE.keys():
+            raise ValueError("Valid Sources: AlphaVantage, NewsAPI.")
+
+        self._key = value
+
+    @property
+    def upload_metadata(self) -> dict[str, str] | None:
+        """The metadata uploaded into the warehouse with the object."""
+        return self._upload_metadata
+
+    @upload_metadata.setter
+    def upload_metadata(self, value: dict[str, str] | None) -> None:
+        expected_keys = {"fetch_date", "source", "ticker", "http_status"}
+        if value is not None:
+            missing_keys = expected_keys - value.keys()
+            if missing_keys:
+                raise KeyError(f"Missing Keys: {missing_keys}.")
+        self._upload_metadata = value
 
     @property
     def error_message(self) -> str:

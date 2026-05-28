@@ -1,0 +1,2 @@
+2026-05-28 16:18:44,893 INFO __main__: Batch Summary: total=20, AV=10, NewsAPI=10, failed=0
+2026-05-28 16:26:26,047 INFO __main__: Batch Summary: total=20, AV=10, NewsAPI=10, failed=0
